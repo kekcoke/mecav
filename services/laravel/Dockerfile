@@ -7,13 +7,13 @@ RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
     && apk del $PHPIZE_DEPS
 
 WORKDIR /var/www/html
-COPY composer.json composer.lock ./
+COPY services/laravel/composer.json services/laravel/composer.lock ./
 RUN php -r "copy('https://getcomposer.org/installer', 'cs.php');" \
     && php cs.php --install-dir=/usr/local/bin --filename=composer \
     && rm cs.php \
     && composer install --no-dev --no-interaction --optimize-autoloader
 
-COPY . .
+COPY services/laravel .
 RUN php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache \

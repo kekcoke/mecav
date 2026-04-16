@@ -15,7 +15,8 @@ services:
 
   python-service:
     build:
-      context: ./services/python
+      context: .
+      dockerfile: ./services/python/Dockerfile
     ports:
       - "50051:50051"
     env_file:
@@ -26,7 +27,8 @@ services:
 
   laravel-api:
     build:
-      context: ./services/laravel
+      context: .
+      dockerfile: ./services/laravel/Dockerfile
     ports:
       - "8000:8000"
     env_file:
