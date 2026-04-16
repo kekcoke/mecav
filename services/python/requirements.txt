@@ -1,23 +1,23 @@
 # Core
 fastapi==0.111.0
 uvicorn[standard]==0.29.0
-grpcio==1.63.0
-grpcio-tools==1.63.0
-grpcio-reflection==1.63.0
+grpcio>=1.63.0
+grpcio-tools>=1.63.0
+grpcio-reflection>=1.63.0
 protobuf==5.26.1
 
 # LangChain + RAG
-langchain==0.2.1
-langchain-community==0.2.1
-langchain-openai==0.1.7
-langchain-postgres==0.0.4
+langchain>=0.2.1
+langchain-community>=0.2.1
+langchain-openai>=0.1.7
+langchain-postgres>=0.0.4
 openai==1.28.0
 
 # pgvector / SQLAlchemy
 sqlalchemy==2.0.30
 alembic==1.13.1
-psycopg[binary,pool]==3.1.19
-pgvector==0.3.0
+psycopg[binary,pool]>=3.1.19
+pgvector==0.2.5
 
 # Observability
 opentelemetry-sdk==1.24.0
