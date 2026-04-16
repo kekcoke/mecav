@@ -1,6 +1,7 @@
 FROM php:8.3-fpm-alpine AS base
 
 RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
+    && export MAKEFLAGS="-j$(nproc)" \
     && pecl install grpc protobuf \
     && docker-php-ext-enable grpc protobuf \
     && docker-php-ext-install pdo pdo_pgsql pcntl \
