@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package multimodal.v1;
+
+option go_package = "github.com/your-org/multimodal/gen/go;multimodalv1";
+
+// ── Shared Enums ─────────────────────────────────────────────
+enum Modality {
+  MODALITY_UNSPECIFIED = 0;
+  MODALITY_TEXT        = 1;
+  MODALITY_FILE        = 2;
+  MODALITY_VOICE       = 3;
+}
+
+// ── Messages ─────────────────────────────────────────────────
+message TextChunk {
+  string diagram_id  = 1;
+  string session_id  = 2;
+  string content     = 3;
+  uint32 chunk_index = 4;
+}
+
+message FileChunk {
+  string diagram_id = 1;
+  string session_id = 2;
+  string filename   = 3;
+  string mime_type  = 4;
+  bytes  data       = 5;  // streamed in chunks
+  uint32 chunk_index = 6;
+  bool   is_last    = 7;
+}
+
+message VoiceChunk {
+  string diagram_id    = 1;
+  string session_id    = 2;
+  bytes  audio_data    = 3;
+  string codec         = 4;  // e.g. "opus", "pcm_s16le"
+  uint32 sample_rate   = 5;
+  uint32 chunk_index   = 6;
+  bool   is_last       = 7;
+}
+
+message MultimodalRequest {
+  string diagram_id    = 1;
+  string session_id    = 2;
+  Modality modality    = 3;
+  oneof payload {
+    TextChunk  text    = 4;
+    FileChunk  file    = 5;
+    VoiceChunk voice   = 6;
+  }
+  map<string, string> metadata = 7;
+}
+
+message DiagramSuggestion {
+  string suggestion_id     = 1;
+  string diagram_id        = 2;
+  string mermaid_code      = 3;
+  string explanation       = 4;
+  float  confidence        = 5;
+  repeated string sources  = 6;
+  map<string, string> meta = 7;
+}
+
+message StreamResponse {
+  string  request_id   = 1;
+  bool    done         = 2;
+  oneof output {
+    DiagramSuggestion suggestion = 3;
+    string            error      = 4;
+  }
+}
+
+// ── Service ──────────────────────────────────────────────────
+service MultimodalDiagramService {
+  // Unary — quick text query → suggestion
+  rpc AnalyzeText(TextChunk) returns (DiagramSuggestion);
+
+  // Server-streaming — file upload with streaming AI response
+  rpc AnalyzeFile(stream FileChunk) returns (stream StreamResponse);
+
+  // Bidi-streaming — real-time voice transcription + diagram generation
+  rpc AnalyzeVoice(stream VoiceChunk) returns (stream StreamResponse);
+
+  // Generic multimodal (preferred entry-point)
+  rpc Process(stream MultimodalRequest) returns (stream StreamResponse);
+}
