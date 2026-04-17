@@ -1,7 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\DiagramController;
-use App\Http\Controllers\AiServiceController;
+use App\Http\Controllers\Api\AiServiceController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
