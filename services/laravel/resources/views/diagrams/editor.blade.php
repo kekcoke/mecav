@@ -115,11 +115,11 @@
     "diagramId": "{{ $diagram->ulid }}",
     "aiEnabled": {{ $diagram->ai_enabled ? 'true' : 'false' }},
     "routes": {
-        "update":   "{{ route('diagrams.update', $diagram) }}",
-        "snapshots": "{{ route('diagrams.snapshots', $diagram) }}",
-        "revert":   "{{ route('diagrams.revert', [$diagram, '__SNAP__']) }}",
-        "export":   "{{ route('diagrams.export', $diagram) }}",
-        "aiSuggest":"{{ route('diagrams.ai-suggest', $diagram) }}"
+        "update":   "{{ route('api.diagrams.update', $diagram) }}",
+        "snapshots": "{{ route('api.diagrams.snapshots', $diagram) }}",
+        "revert":   "{{ route('api.diagrams.revert', [$diagram, '__SNAP__']) }}",
+        "export":   "{{ route('api.diagrams.export', $diagram) }}",
+        "aiSuggest":"{{ route('api.diagrams.ai-suggest', $diagram) }}"
     }
 }
 </script>

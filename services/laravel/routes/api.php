@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\DiagramController;
+use App\Http\Controllers\Api\DiagramController;
 use App\Http\Controllers\AiServiceController;
 use Illuminate\Support\Facades\Route;
 
