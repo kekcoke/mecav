@@ -52,31 +52,63 @@ graph TD
 
 ## Quick Start
 
+### Docker Compose (Local Development)
+
 ```bash
 # 1. Clone
 git clone https://github.com/your-org/mecav && cd mecav
 
-# 2. Configure environment variables
+# 2. Start all services
+docker compose up -d
+
+# 3. Run migrations
+docker exec mecav-laravel-api-1 php artisan migrate
+
+# 4. Create admin user
+docker exec mecav-laravel-api-1 php artisan tinker --execute="\App\Models\User::create(['name' => 'Admin User', 'email' => 'admin@mecav.local', 'password' => bcrypt('mecav2026!'), 'email_verified_at' => now(), 'role' => 'admin']);"
+
+# 5. Open browser
+open http://localhost:8000
+```
+
+### Default Credentials
+
+| Email | Password |
+|-------|----------|
+| `admin@mecav.local` | `mecav2026!` |
+
+### Service Ports
+
+| Service | Port | URL |
+|---------|------|-----|
+| Laravel API | 8000 | http://localhost:8000 |
+| Python gRPC | 50051 | grpc://localhost:50051 |
+| PostgreSQL | 5432 | localhost:5432 |
+
+### Manual Setup (Non-Docker)
+
+```bash
+# 1. Configure environment variables
 cp services/laravel/.env.example services/laravel/.env
 cp services/python/.env.example  services/python/.env
 # Edit both .env files — DATABASE_URL, OPENAI_API_KEY, GRPC_SERVICE_TOKEN
 
-# 3. Compile proto stubs (Python)
+# 2. Compile proto stubs (Python)
 cd services/python
 python -m grpc_tools.protoc \
   -I ../../protobuf \
   --python_out=proto --grpc_python_out=proto \
   ../../protobuf/multimodal.proto
 
-# 4. Laravel setup
+# 3. Laravel setup
 cd ../laravel
 composer install && php artisan key:generate && php artisan migrate
 
-# 5. Python setup
+# 4. Python setup
 cd ../python
 pip install -r requirements.txt && alembic upgrade head
 
-# 6. Start services
+# 5. Start services
 php artisan serve          # Laravel  → localhost:8000
 python -m app.main         # gRPC     → localhost:50051
 ```
