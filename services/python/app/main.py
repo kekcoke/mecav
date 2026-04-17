@@ -1,11 +1,12 @@
 """
-Entrypoint — starts the gRPC server and optional metrics server.
+Entrypoint — starts the gRPC server, REST server (FastAPI), and optional metrics server.
 Future autonomous agents connect as separate K8s sidecars; they register
 themselves via the MultimodalDiagramService.Process() bidi-stream endpoint.
 """
 import asyncio
 import signal
 import sys
+import threading
 
 import grpc
 import structlog
@@ -47,11 +48,30 @@ def build_server() -> grpc.Server:
     return server
 
 
+def run_rest_server():
+    """Run FastAPI REST server in a separate thread."""
+    import uvicorn
+    from app.rest_server import app as fastapi_app
+    
+    uvicorn.run(
+        fastapi_app,
+        host="0.0.0.0",
+        port=settings.rest_port,
+        log_level="info",
+    )
+
+
 def main() -> None:
     # Prometheus metrics
     start_http_server(settings.prometheus_port)
     log.info("prometheus_metrics_started", port=settings.prometheus_port)
 
+    # Start REST server in background thread
+    rest_thread = threading.Thread(target=run_rest_server, daemon=True)
+    rest_thread.start()
+    log.info("rest_server_started", host="0.0.0.0", port=settings.rest_port)
+
+    # Start gRPC server
     server = build_server()
     server.start()
     log.info("grpc_server_started", host=settings.grpc_host, port=settings.grpc_port)

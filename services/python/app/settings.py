@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     grpc_max_workers: int = Field(10, alias="GRPC_MAX_WORKERS")
     service_token: str = Field("", alias="GRPC_SERVICE_TOKEN")
 
+    # REST (for Laravel HTTP client)
+    rest_host: str = Field("0.0.0.0", alias="REST_HOST")
+    rest_port: int = Field(8001, alias="REST_PORT")
+
     # Database
     database_url: str = Field(..., alias="DATABASE_URL")
     # e.g. postgresql+psycopg://user:pass@host:5432/diagrams
