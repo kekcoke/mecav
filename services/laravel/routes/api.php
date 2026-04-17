@@ -4,7 +4,7 @@ use App\Http\Controllers\DiagramController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
-    Route::apiResource('diagrams', DiagramController::class);
+    Route::apiResource('diagrams', DiagramController::class)->names('api.diagrams');
 
     Route::prefix('diagrams/{diagram}')->name('diagrams.')->group(function () {
         Route::get ('snapshots',          [DiagramController::class, 'snapshots'])  ->name('snapshots');
