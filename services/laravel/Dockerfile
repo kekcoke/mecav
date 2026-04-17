@@ -1,3 +1,17 @@
+# Stage 1: Node.js builder for assets
+FROM node:20-alpine AS node-builder
+
+WORKDIR /app
+
+COPY services/laravel/package.json services/laravel/package-lock.json* ./
+COPY services/laravel/vite.config.js ./
+COPY services/laravel/index.html ./
+COPY services/laravel/resources ./resources
+COPY services/laravel/public ./public
+
+RUN npm install && npm run build
+
+# Stage 2: PHP builder (existing)
 FROM php:8.3-fpm-alpine AS builder
 
 # Install build dependencies and compile gRPC
@@ -33,6 +47,9 @@ RUN php artisan config:cache \
     && docker-php-ext-enable grpc \
     && echo "extension=grpc.so" > /usr/local/etc/php/conf.d/docker-php-ext-grpc.ini \
     && chown -R www-data:www-data storage bootstrap/cache
+
+# Copy compiled assets from Node builder
+COPY --from=node-builder /app/public/build ./public/build
 
 # Copy nginx and supervisor configs
 COPY services/laravel/nginx.conf /etc/nginx/http.d/default.conf

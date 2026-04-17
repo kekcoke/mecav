@@ -3,11 +3,12 @@ services:
     env_file:
       - ./services/python/.env.local
     volumes:
-      - ./services/python:/app
+      - ./services/python/app:/app/app
+      - ./services/python/proto:/app/proto
       - ./protobuf:/proto
       - /app/__pycache__
     command: >
-      sh -c "python -m grpc_tools.protoc -I /proto --python_out=/app/proto --grpc_python_out=/app/proto /proto/multimodal.proto && uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+      sh -c "python -m grpc_tools.protoc -I /proto --python_out=/app/proto --grpc_python_out=/app/proto /proto/multimodal.proto && sed -i 's/^import multimodal_pb2/from proto import multimodal_pb2/' /app/proto/multimodal_pb2_grpc.py && uvicorn app.rest_server:app --host 0.0.0.0 --port 8001 --reload"
 
   laravel-api:
     image: mecav-laravel-api:latest
@@ -16,3 +17,12 @@ services:
     volumes:
       - ./services/laravel:/var/www/html
       - /var/www/html/vendor
+
+  vite:
+    image: node:20-alpine
+    working_dir: /var/www/html
+    volumes:
+      - ./services/laravel:/var/www/html
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev"

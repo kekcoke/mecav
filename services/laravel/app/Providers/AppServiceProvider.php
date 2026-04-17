@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
         Config::set('database.connections.pgsql.password', 'secret');
         Config::set('cache.default', 'file');
         Config::set('session.driver', 'file');
+
+        // Auto-migrate and seed in local/dev
+        if (app()->environment('local', 'development')) {
+            $this->call(\Database\Seeders\DatabaseSeeder::class);
+        }
         
         // Rate limiters
         RateLimiter::for('api', function (Request $request) {
