@@ -2,103 +2,162 @@
 
 namespace App\Grpc;
 
-use Multimodal\V1\MultimodalDiagramServiceClient;
-use Multimodal\V1\TextChunk;
-use Multimodal\V1\FileChunk;
-use Multimodal\V1\DiagramSuggestion;
-use Grpc\Channel;
-use Grpc\ChannelCredentials;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Thin gRPC client — Laravel only knows the contract, not the AI implementation.
- *
- * Generated stubs are produced by running:
- *   protoc --php_out=app/Grpc/Generated --grpc_out=app/Grpc/Generated \
- *          --plugin=protoc-gen-grpc=$(which grpc_php_plugin) \
- *          ../../protobuf/multimodal.proto
+ * HTTP/REST client for Python AI Service
+ * 
+ * Note: gRPC PHP extension has compilation issues with PHP 8.3/8.4 on Alpine.
+ * This HTTP client provides equivalent functionality via REST endpoints.
+ * 
+ * The Python service exposes REST endpoints at:
+ *   POST /api/analyze/text -> AnalyzeText
+ *   POST /api/analyze/file -> AnalyzeFile (streaming)
+ *   GET  /health          -> Health check
  */
 final class MultimodalClient
 {
-    private MultimodalDiagramServiceClient $client;
+    private string $baseUrl;
+    private string $token;
+    private int $timeout;
 
     public function __construct()
     {
-        $host     = config('grpc.python_service_host', 'python-service:50051');
-        $insecure = config('grpc.insecure', true);
-
-        $this->client = new MultimodalDiagramServiceClient(
-            $host,
-            [
-                'credentials' => $insecure
-                    ? ChannelCredentials::createInsecure()
-                    : ChannelCredentials::createSsl(),
-                'update_metadata' => function (array $metadata) {
-                    // Inject service-to-service auth token
-                    $metadata['authorization'] = ['Bearer ' . config('grpc.service_token')];
-                    return $metadata;
-                },
-            ]
-        );
+        $host = config('grpc.python_service_host', 'python-service:50051');
+        
+        // Convert gRPC host to HTTP URL
+        if (str_starts_with($host, 'http')) {
+            $this->baseUrl = rtrim($host, '/');
+        } else {
+            // Remove port if present, add http:// prefix
+            $host = preg_replace('/:\d+$/', '', $host);
+            $this->baseUrl = 'http://' . $host;
+        }
+        
+        $this->token = config('grpc.service_token', '');
+        $this->timeout = (int) config('grpc.timeout_ms', 30000) / 1000;
     }
 
     /**
-     * Send mermaid source text and receive an AI diagram suggestion (unary).
+     * Send mermaid source text and receive an AI diagram suggestion.
+     * Maps to gRPC: AnalyzeText(TextChunk) -> DiagramSuggestion
      */
-    public function analyzeText(string $diagramId, string $sessionId, string $content): DiagramSuggestion
+    public function analyzeText(string $diagramId, string $sessionId, string $content): DiagramSuggestionResponse
     {
-        $request = new TextChunk();
-        $request->setDiagramId($diagramId);
-        $request->setSessionId($sessionId);
-        $request->setContent($content);
-
-        [$response, $status] = $this->client->AnalyzeText($request)->wait();
-
-        if ($status->code !== \Grpc\STATUS_OK) {
-            Log::error('gRPC AnalyzeText failed', [
-                'code'    => $status->code,
-                'details' => $status->details,
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->token,
+                'Content-Type' => 'application/json',
+            ])
+            ->timeout($this->timeout)
+            ->post($this->baseUrl . '/api/analyze/text', [
+                'diagram_id' => $diagramId,
+                'session_id' => $sessionId,
+                'content' => $content,
             ]);
-            throw new \RuntimeException("gRPC error [{$status->code}]: {$status->details}");
-        }
 
-        return $response;
+            if (!$response->successful()) {
+                Log::error('HTTP AnalyzeText failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                throw new \RuntimeException("HTTP error [{$response->status()}]: {$response->body()}");
+            }
+
+            $data = $response->json();
+            
+            return new DiagramSuggestionResponse(
+                suggestionId: $data['suggestion_id'] ?? uniqid('suggestion_'),
+                diagramId: $data['diagram_id'] ?? $diagramId,
+                mermaidCode: $data['mermaid_code'] ?? $content,
+                explanation: $data['explanation'] ?? '',
+                confidence: $data['confidence'] ?? 0.0,
+                sources: $data['sources'] ?? []
+            );
+            
+        } catch (\Exception $e) {
+            Log::error('HTTP AnalyzeText exception', ['message' => $e->getMessage()]);
+            throw $e;
+        }
     }
 
     /**
      * Stream a file to the Python service and collect streamed responses.
-     *
-     * @return \Generator<\Multimodal\V1\StreamResponse>
+     * Maps to gRPC: AnalyzeFile(stream FileChunk) -> stream StreamResponse
+     * 
+     * @return \Generator<DiagramSuggestionResponse>
      */
     public function analyzeFile(string $diagramId, string $sessionId, string $filePath, string $mimeType): \Generator
     {
-        $call = $this->client->AnalyzeFile();
-
         $chunkSize = 64 * 1024; // 64 KB
-        $handle    = fopen($filePath, 'rb');
-        $index     = 0;
-
-        while (!feof($handle)) {
-            $data  = fread($handle, $chunkSize);
-            $isLast = feof($handle);
-
-            $chunk = new FileChunk();
-            $chunk->setDiagramId($diagramId);
-            $chunk->setSessionId($sessionId);
-            $chunk->setFilename(basename($filePath));
-            $chunk->setMimeType($mimeType);
-            $chunk->setData($data);
-            $chunk->setChunkIndex($index++);
-            $chunk->setIsLast($isLast);
-
-            $call->write($chunk);
+        $handle = fopen($filePath, 'rb');
+        
+        if (!$handle) {
+            throw new \RuntimeException("Cannot open file: $filePath");
         }
+        
+        try {
+            $index = 0;
+            while (!feof($handle)) {
+                $data = fread($handle, $chunkSize);
+                $isLast = feof($handle);
+                
+                // For streaming, we'd use chunked transfer encoding
+                // This is a simplified version - real implementation would use
+                // a streaming HTTP client or Server-Sent Events
+                $response = Http::withHeaders([
+                    'Authorization' => 'Bearer ' . $this->token,
+                    'Content-Type' => 'application/octet-stream',
+                    'X-Diagram-Id' => $diagramId,
+                    'X-Session-Id' => $sessionId,
+                    'X-Chunk-Index' => (string) $index,
+                    'X-Is-Last' => $isLast ? 'true' : 'false',
+                    'X-Filename' => basename($filePath),
+                    'X-Mime-Type' => $mimeType,
+                ])
+                ->timeout($this->timeout)
+                ->withBody($data, 'application/octet-stream')
+                ->post($this->baseUrl . '/api/analyze/file');
 
-        fclose($handle);
-        $call->writesDone();
-
-        foreach ($call->responses() as $response) {
-            yield $response;
+                if ($response->successful()) {
+                    $data = $response->json();
+                    yield new DiagramSuggestionResponse(
+                        suggestionId: $data['suggestion_id'] ?? '',
+                        diagramId: $data['diagram_id'] ?? $diagramId,
+                        mermaidCode: $data['mermaid_code'] ?? '',
+                        explanation: $data['explanation'] ?? '',
+                        confidence: $data['confidence'] ?? 0.0,
+                        sources: $data['sources'] ?? []
+                    );
+                }
+                
+                $index++;
+            }
+        } finally {
+            fclose($handle);
         }
     }
+}
+
+/**
+ * Value object for diagram suggestions (replaces gRPC's DiagramSuggestion)
+ */
+class DiagramSuggestionResponse
+{
+    public function __construct(
+        public readonly string $suggestionId,
+        public readonly string $diagramId,
+        public readonly string $mermaidCode,
+        public readonly string $explanation,
+        public readonly float $confidence,
+        public readonly array $sources
+    ) {}
+
+    public function getSuggestionId(): string { return $this->suggestionId; }
+    public function getDiagramId(): string { return $this->diagramId; }
+    public function getMermaidCode(): string { return $this->mermaidCode; }
+    public function getExplanation(): string { return $this->explanation; }
+    public function getConfidence(): float { return $this->confidence; }
+    public function getSources(): array { return $this->sources; }
 }

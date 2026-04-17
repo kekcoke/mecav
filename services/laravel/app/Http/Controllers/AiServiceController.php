@@ -78,22 +78,10 @@ class AiServiceController extends Controller
             'mermaid_code' => 'required|string',
         ]);
         
-        // Check if gRPC is available, fall back to HTTP
-        if (extension_loaded('grpc')) {
-            return $this->analyzeViaGrpc($diagramId, $request->input('mermaid_code'));
-        }
-        
-        return $this->analyzeText($request, $diagramId);
-    }
-    
-    /**
-     * gRPC fallback using MultimodalClient if extension is loaded
-     */
-    private function analyzeViaGrpc(string $diagramId, string $content)
-    {
         try {
+            // Use MultimodalClient (now HTTP-based)
             $client = app(\App\Grpc\MultimodalClient::class);
-            $result = $client->analyzeText($diagramId, uniqid(), $content);
+            $result = $client->analyzeText($diagramId, uniqid(), $request->input('mermaid_code'));
             
             return response()->json([
                 'suggestion_id' => $result->getSuggestionId(),
@@ -103,25 +91,18 @@ class AiServiceController extends Controller
                 'sources' => $result->getSources(),
             ]);
         } catch (\Exception $e) {
-            Log::warning('gRPC fallback failed, using HTTP', ['error' => $e->getMessage()]);
-            return $this->analyzeViaHttpFallback($diagramId, $content);
+            Log::warning('AI suggest failed', ['error' => $e->getMessage()]);
+            
+            // Return graceful fallback
+            return response()->json([
+                'suggestion_id' => null,
+                'mermaid_code' => $request->input('mermaid_code'),
+                'explanation' => 'AI suggestions temporarily unavailable: ' . $e->getMessage(),
+                'confidence' => 0.0,
+                'sources' => [],
+                'fallback' => true,
+            ]);
         }
-    }
-    
-    /**
-     * HTTP fallback when gRPC is not available
-     */
-    private function analyzeViaHttpFallback(string $diagramId, string $content)
-    {
-        // Return a placeholder response when AI service is unavailable
-        return response()->json([
-            'suggestion_id' => null,
-            'mermaid_code' => $content,
-            'explanation' => 'AI suggestion unavailable - gRPC extension not loaded',
-            'confidence' => 0.0,
-            'sources' => [],
-            'fallback' => true,
-        ]);
     }
     
     /**
