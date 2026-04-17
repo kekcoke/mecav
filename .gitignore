@@ -12,6 +12,7 @@ __pycache__/
 *.phar
 *.sqlite
 /services/laravel/storage/*.log
+/services/laravel/storage/logs
 /services/laravel/storage/framework/cache/*
 /services/laravel/storage/framework/sessions/*
 /services/laravel/storage/framework/views/*
