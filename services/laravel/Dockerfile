@@ -11,7 +11,7 @@ RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
 FROM php:8.3-fpm-alpine
 
 # Install runtime and build deps, then install gRPC
-RUN apk add --no-cache postgresql-libs nginx supervisor linux-headers $PHPIZE_DEPS \
+RUN apk add --no-cache postgresql-libs nginx supervisor linux-headers zlib-dev $PHPIZE_DEPS \
     && pecl install grpc protobuf \
     && docker-php-ext-install pdo pdo_pgsql pcntl \
     && rm -rf /tmp/pear
