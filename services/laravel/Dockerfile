@@ -1,6 +1,6 @@
-FROM php:8.4-fpm-alpine AS builder
+FROM php:8.3-fpm-alpine AS builder
 
-# Install build dependencies
+# Install build dependencies and compile gRPC
 RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
     && export MAKEFLAGS="-j2" \
     && php -d memory_limit=-1 $(which pecl) install grpc protobuf \
@@ -8,14 +8,13 @@ RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
     && rm -rf /tmp/pear
 
 # Final Stage
-FROM php:8.4-fpm-alpine
+FROM php:8.3-fpm-alpine
 
-# Install runtime dependencies
-RUN apk add --no-cache postgresql-libs nginx supervisor
-
-# Copy extensions from builder
-COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
-COPY --from=builder /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
+# Install runtime and build deps, then install gRPC
+RUN apk add --no-cache postgresql-libs nginx supervisor linux-headers $PHPIZE_DEPS \
+    && pecl install grpc protobuf \
+    && docker-php-ext-install pdo pdo_pgsql pcntl \
+    && rm -rf /tmp/pear
 
 WORKDIR /var/www/html
 
@@ -26,7 +25,7 @@ COPY services/laravel .
 RUN php -r "copy('https://getcomposer.org/installer', 'cs.php');" \
     && php cs.php --install-dir=/usr/local/bin --filename=composer \
     && rm cs.php \
-    && composer install --no-dev --no-interaction --optimize-autoloader
+    && composer update --no-dev --no-interaction --prefer-dist --ignore-platform-reqs
 
 RUN php artisan config:cache \
     && php artisan route:cache \
