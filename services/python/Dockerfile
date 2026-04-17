@@ -22,4 +22,4 @@ EXPOSE 50051 8001
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD python -c "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"
 # REST API available at port 8001
-CMD ["python", "-m", "app.main"]
+CMD ["watchfiles", "python", "-m", "app.main"]

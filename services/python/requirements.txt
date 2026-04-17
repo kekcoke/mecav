@@ -29,3 +29,6 @@ pydantic-settings==2.2.1
 python-dotenv==1.0.1
 structlog==24.1.0
 tenacity==8.3.0
+
+# Local
+watchfiles==0.19.0
