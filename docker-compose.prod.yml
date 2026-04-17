@@ -1,0 +1,13 @@
+services:
+  db:
+    restart: unless-stopped
+
+  python-service:
+    restart: unless-stopped
+    env_file:
+      - ./services/python/.env.prod
+
+  laravel-api:
+    restart: unless-stopped
+    env_file:
+      - ./services/laravel/.env.prod
