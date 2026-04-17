@@ -4,7 +4,7 @@ uvicorn[standard]==0.29.0
 grpcio>=1.63.0
 grpcio-tools>=1.63.0
 grpcio-reflection>=1.63.0
-protobuf==5.26.1
+protobuf>=5.29.0
 
 # LangChain + RAG
 langchain>=0.2.1
