@@ -11,7 +11,7 @@ RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS \
 FROM php:8.4-fpm-alpine
 
 # Install runtime dependencies
-RUN apk add --no-cache postgresql-libs
+RUN apk add --no-cache postgresql-libs nginx supervisor
 
 # Copy extensions from builder
 COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
@@ -33,5 +33,9 @@ RUN php artisan config:cache \
     && php artisan view:cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-EXPOSE 9000
-CMD ["php-fpm"]
+# Copy nginx and supervisor configs
+COPY services/laravel/nginx.conf /etc/nginx/http.d/default.conf
+COPY services/laravel/supervisord.conf /etc/supervisord.conf
+
+EXPOSE 8000
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
