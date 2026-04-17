@@ -18,7 +18,8 @@ RUN mkdir -p /app/proto && \
 FROM base AS runtime
 COPY --from=proto-builder /app/proto /app/proto
 COPY services/python /app
-EXPOSE 50051
+EXPOSE 50051 8001
 HEALTHCHECK --interval=30s --timeout=5s \
     CMD python -c "import grpc; ch=grpc.insecure_channel('localhost:50051'); grpc.channel_ready_future(ch).result(timeout=5)"
+# REST API available at port 8001
 CMD ["python", "-m", "app.main"]

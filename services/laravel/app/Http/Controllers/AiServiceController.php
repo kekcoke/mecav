@@ -28,7 +28,7 @@ class AiServiceController extends Controller
      * Analyze text and get diagram suggestion
      * Maps to gRPC: AnalyzeText(TextChunk) -> DiagramSuggestion
      */
-    public function analyzeText(Request $request, string $diagramId)
+    public function analyze(Request $request, string $diagramId)
     {
         $request->validate([
             'content' => 'required|string|max:50000',

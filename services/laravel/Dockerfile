@@ -30,6 +30,8 @@ RUN php -r "copy('https://getcomposer.org/installer', 'cs.php');" \
 RUN php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache \
+    && docker-php-ext-enable grpc \
+    && echo "extension=grpc.so" > /usr/local/etc/php/conf.d/docker-php-ext-grpc.ini \
     && chown -R www-data:www-data storage bootstrap/cache
 
 # Copy nginx and supervisor configs

@@ -26,13 +26,15 @@ final class MultimodalClient
     {
         $host = config('grpc.python_service_host', 'python-service:50051');
         
-        // Convert gRPC host to HTTP URL
+        // Convert gRPC host to HTTP URL for REST API (port 8001)
         if (str_starts_with($host, 'http')) {
-            $this->baseUrl = rtrim($host, '/');
-        } else {
-            // Remove port if present, add http:// prefix
+            // Remove any existing port and use 8001 for REST
             $host = preg_replace('/:\d+$/', '', $host);
-            $this->baseUrl = 'http://' . $host;
+            $this->baseUrl = 'http://' . $host . ':8001';
+        } else {
+            // Remove port if present, add http:// prefix and REST port
+            $host = preg_replace('/:\d+$/', '', $host);
+            $this->baseUrl = 'http://' . $host . ':8001';
         }
         
         $this->token = config('grpc.service_token', '');
