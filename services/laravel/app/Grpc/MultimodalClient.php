@@ -2,10 +2,10 @@
 
 namespace App\Grpc;
 
-use App\Grpc\Generated\MultimodalDiagramServiceClient;
-use App\Grpc\Generated\TextChunk;
-use App\Grpc\Generated\FileChunk;
-use App\Grpc\Generated\DiagramSuggestion;
+use Multimodal\V1\MultimodalDiagramServiceClient;
+use Multimodal\V1\TextChunk;
+use Multimodal\V1\FileChunk;
+use Multimodal\V1\DiagramSuggestion;
 use Grpc\Channel;
 use Grpc\ChannelCredentials;
 use Illuminate\Support\Facades\Log;
@@ -68,7 +68,7 @@ final class MultimodalClient
     /**
      * Stream a file to the Python service and collect streamed responses.
      *
-     * @return \Generator<\App\Grpc\Generated\StreamResponse>
+     * @return \Generator<\Multimodal\V1\StreamResponse>
      */
     public function analyzeFile(string $diagramId, string $sessionId, string $filePath, string $mimeType): \Generator
     {
