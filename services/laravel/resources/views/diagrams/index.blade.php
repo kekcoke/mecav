@@ -116,7 +116,10 @@
         // Fetch diagram data if not server-rendered
         try {
             const res  = await fetch('/api/diagrams/' + ulid, {
-                headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + getToken() }
+                headers: { 
+                    'Accept': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
             if (!res.ok) return;
             const data = await res.json();
@@ -126,9 +129,6 @@
                 const { svg } = await mermaid.render(id, data.mermaid_code);
                 el.innerHTML = svg;
             }
-        } catch (_) {}
-    });
-
     function getToken() {
         return '{{ session('api_token') }}' || localStorage.getItem('token') || '';
     }
