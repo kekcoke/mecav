@@ -17,6 +17,11 @@ class AuthController extends Controller
 
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
+            
+            $user = Auth::user();
+            $token = $user->createToken('auth_token')->plainTextToken;
+            session(['api_token' => $token]);
+
             return redirect()->intended('/diagrams');
         }
 

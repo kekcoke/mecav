@@ -35,6 +35,9 @@
                 </select>
             </div>
 
+            <input type="hidden" name="mermaid_code" value="flowchart TD\n    Start --> End">
+            <input type="hidden" name="ai_enabled" value="1">
+
             <div class="form-actions">
                 <button type="submit" class="btn-primary">Create & Open Editor</button>
             </div>
@@ -55,6 +58,7 @@ document.getElementById('createForm').addEventListener('submit', async (e) => {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Authorization': 'Bearer ' + ('{{ session('api_token') }}' || localStorage.getItem('token') || ''),
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
             },
             body: JSON.stringify(data)

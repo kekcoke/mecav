@@ -130,7 +130,7 @@
     });
 
     function getToken() {
-        return localStorage.getItem('token') || '';
+        return '{{ session('api_token') }}' || localStorage.getItem('token') || '';
     }
 
     // Client-side filter (live search)
