@@ -17,23 +17,19 @@ RUN npm ci && npm run build
 
 
 # ── Stage 2: PHP extension builder ────────────────────────────────────────────
-FROM php:8.3-fpm-alpine AS builder
+FROM php:8.3-fpm AS builder
 
-# All build-time deps: compiler toolchain + postgres dev headers
-RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS
+# All build-time deps: compiler toolchain + postgres + zlib dev headers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq-dev linux-headers-${KERNEL_VERSION} zlib1g-dev $PHPIZE_DEPS \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install gRPC and Protobuf via pecl *separately* so each failure surfaces
-# explicitly — combined `pecl install grpc protobuf` can silently swallow a
-# build failure for the second package while still exiting 0.
-# protobuf-dev + zlib-dev provide headers needed for gRPC compilation.
-RUN apk add --no-cache protobuf-dev zlib-dev \
-    && export MAKEFLAGS="-j2" \
-    && php -d memory_limit=-1 "$(which pecl)" install grpc-1.65.5 \
-    && php -d memory_limit=-1 "$(which pecl)" install protobuf-4.29.1 \
-    && rm -rf /tmp/pear /tmp/pear-* \
-    && ext_dir="$(php -r 'echo ini_get(\"extension_dir\");')" \
-    && test -f "${ext_dir}/grpc.so" \
-    && test -f "${ext_dir}/protobuf.so"
+# Install gRPC and Protobuf via pecl *separately* so each failure surfaces.
+RUN export MAKEFLAGS="-j$(nproc)" \
+    && pecl install grpc-1.65.5 \
+    && pecl install protobuf-4.29.1 \
+    && docker-php-ext-enable grpc protobuf \
+    && rm -rf /tmp/pear /tmp/pear-*
 
 # Compile pdo, pdo_pgsql, pcntl here where postgresql-dev and $PHPIZE_DEPS
 # are present. The final stage has no compiler so these cannot be built there.
@@ -54,10 +50,12 @@ RUN ext_dir="$(php -r 'echo ini_get("extension_dir");')" \
 
 
 # ── Stage 3: Final runtime image ──────────────────────────────────────────────
-FROM php:8.3-fpm-alpine
+FROM php:8.3-fpm
 
 # Runtime-only OS packages — no compiler, no dev headers
-RUN apk add --no-cache libpq nginx supervisor
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq5 nginx supervisor \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the staged .so files into the extension directory that *this* PHP build
 # reports at runtime (same dynamic resolution, no hardcoded path).

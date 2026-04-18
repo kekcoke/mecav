@@ -24,11 +24,6 @@ class AppServiceProvider extends ServiceProvider
         Config::set('cache.default', 'file');
         Config::set('session.driver', 'file');
 
-        // Auto-seed in local/dev environment
-        if (app()->environment('local', 'development')) {
-            Artisan::call('db:seed', ['--force' => true]);
-        }
-        
         // Rate limiters
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
