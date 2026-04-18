@@ -1,0 +1,223 @@
+# .github/workflows/ci-cd.yml
+name: CI / CD — DiagramAI Monorepo
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION:         us-east-1
+  ECR_REGISTRY:       ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  LARAVEL_IMAGE:      diagramai/laravel
+  PYTHON_IMAGE:       diagramai/python-service
+  HELM_RELEASE_NS:    diagramai
+
+jobs:
+  # ──────────────────────────────────────────────────────────
+  # 1. LINT & UNIT TEST
+  # ──────────────────────────────────────────────────────────
+  test-laravel:
+    name: Laravel Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/laravel
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: diagrams_test
+          POSTGRES_USER: diagrams
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U diagrams"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: grpc, pdo_pgsql, pcntl
+          coverage: xdebug
+      - name: Install Composer deps
+        run: composer install --no-interaction --prefer-dist
+      - name: Copy env
+        run: cp .env.testing .env
+      - name: Run migrations
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: diagrams_test
+          DB_USERNAME: diagrams
+          DB_PASSWORD: secret
+      - name: PHPUnit
+        run: php artisan test --coverage-clover=coverage.xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laravel-coverage
+          path: services/laravel/coverage.xml
+
+  test-python:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/python
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: diagrams_test
+          POSTGRES_USER: diagrams
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt pytest pytest-cov
+      - name: Compile proto stubs
+        run: |
+          python -m grpc_tools.protoc \
+            -I ../../protobuf \
+            --python_out=proto \
+            --grpc_python_out=proto \
+            ../../protobuf/multimodal.proto
+      - name: Run Alembic migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://diagrams:secret@127.0.0.1:5432/diagrams_test
+      - name: pytest
+        run: pytest --cov=app --cov-report=xml
+        env:
+          DATABASE_URL: postgresql+psycopg://diagrams:secret@127.0.0.1:5432/diagrams_test
+          OPENAI_API_KEY: sk-test-placeholder
+
+  # ──────────────────────────────────────────────────────────
+  # 2. BUILD & PUSH IMAGES (main branch only)
+  # ──────────────────────────────────────────────────────────
+  build-push:
+    name: Build & Push Images
+    needs: [test-laravel, test-python]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write   # OIDC for AWS auth
+    outputs:
+      laravel_tag: ${{ steps.meta-laravel.outputs.version }}
+      python_tag:  ${{ steps.meta-python.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume:   ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:       ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Docker meta — Laravel
+        id: meta-laravel
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ env.LARAVEL_IMAGE }}
+          tags:   type=sha,prefix=,format=short
+
+      - name: Docker meta — Python
+        id: meta-python
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.ECR_REGISTRY }}/${{ env.PYTHON_IMAGE }}
+          tags:   type=sha,prefix=,format=short
+
+      - name: Build & push Laravel image
+        uses: docker/build-push-action@v5
+        with:
+          context:  services/laravel
+          push:     true
+          tags:     ${{ steps.meta-laravel.outputs.tags }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+      - name: Build & push Python image
+        uses: docker/build-push-action@v5
+        with:
+          context:  services/python
+          push:     true
+          tags:     ${{ steps.meta-python.outputs.tags }}
+          cache-from: type=gha
+          cache-to:   type=gha,mode=max
+
+  # ──────────────────────────────────────────────────────────
+  # 3. DEPLOY via Helm
+  # ──────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to EKS
+    needs: build-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region:     ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Helm upgrade — Laravel
+        run: |
+          helm upgrade --install laravel \
+            ./infrastructure/modules/helm/charts/laravel \
+            --namespace ${{ env.HELM_RELEASE_NS }} \
+            --create-namespace \
+            --atomic --timeout 5m \
+            --set image.tag=${{ needs.build-push.outputs.laravel_tag }} \
+            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.LARAVEL_IMAGE }}
+
+      - name: Run Laravel migrations (Job)
+        run: |
+          kubectl create job --from=cronjob/laravel-migrate \
+            laravel-migrate-${{ github.run_number }} \
+            -n ${{ env.HELM_RELEASE_NS }} || true
+          kubectl wait job/laravel-migrate-${{ github.run_number }} \
+            --for=condition=complete --timeout=120s \
+            -n ${{ env.HELM_RELEASE_NS }}
+
+      - name: Helm upgrade — Python service
+        run: |
+          helm upgrade --install python-service \
+            ./infrastructure/modules/helm/charts/python \
+            --namespace ${{ env.HELM_RELEASE_NS }} \
+            --atomic --timeout 5m \
+            --set image.tag=${{ needs.build-push.outputs.python_tag }} \
+            --set image.repository=${{ env.ECR_REGISTRY }}/${{ env.PYTHON_IMAGE }}
+
+      - name: Run Alembic migrations (Job)
+        run: |
+          kubectl create job --from=cronjob/alembic-migrate \
+            alembic-migrate-${{ github.run_number }} \
+            -n ${{ env.HELM_RELEASE_NS }} || true
+          kubectl wait job/alembic-migrate-${{ github.run_number }} \
+            --for=condition=complete --timeout=120s \
+            -n ${{ env.HELM_RELEASE_NS }}
