@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class DiagramSnapshot extends Model
 {
-    use HasUlids;
 
     public $timestamps = false;
 
@@ -24,6 +23,19 @@ class DiagramSnapshot extends Model
         'expires_at'  => 'datetime',
         'created_at'  => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($snapshot) {
+            if (empty($snapshot->ulid)) {
+                $snapshot->ulid = (string) Str::ulid();
+            }
+            if (empty($snapshot->created_at)) {
+                $snapshot->created_at = now();
+            }
+        });
+    }
 
     public function diagram(): BelongsTo
     {
