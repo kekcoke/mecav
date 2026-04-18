@@ -3,16 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Diagram extends Model
 {
-    use HasFactory, HasUlids, SoftDeletes;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'user_id', 'tenant_id', 'title', 'description',
@@ -26,6 +26,16 @@ class Diagram extends Model
         'export_formats' => 'array',
         'storage_bytes'  => 'integer',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($diagram) {
+            if (empty($diagram->ulid)) {
+                $diagram->ulid = (string) Str::ulid();
+            }
+        });
+    }
 
     // ── Relations ────────────────────────────────────────────
     public function user(): BelongsTo
