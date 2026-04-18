@@ -36,7 +36,7 @@ services:
       - vite_node_modules:/var/www/html/node_modules
     ports:
       - "5173:5173"
-    command: sh -c "npm install && npm run dev"
+    command: sh -c "npm install --legacy-peer-deps && npm run dev"
 
 volumes:
   vite_node_modules:
