@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
@@ -23,9 +24,9 @@ class AppServiceProvider extends ServiceProvider
         Config::set('cache.default', 'file');
         Config::set('session.driver', 'file');
 
-        // Auto-migrate and seed in local/dev
+        // Auto-seed in local/dev environment
         if (app()->environment('local', 'development')) {
-            $this->call(\Database\Seeders\DatabaseSeeder::class);
+            Artisan::call('db:seed', ['--force' => true]);
         }
         
         // Rate limiters
