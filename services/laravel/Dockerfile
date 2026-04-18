@@ -25,9 +25,9 @@ RUN apk add --no-cache postgresql-dev linux-headers $PHPIZE_DEPS
 # Install gRPC and Protobuf via pecl *separately* so each failure surfaces
 # explicitly — combined `pecl install grpc protobuf` can silently swallow a
 # build failure for the second package while still exiting 0.
-# protobuf-dev provides the headers required to compile the protobuf extension.
-RUN apk add --no-cache protobuf-dev \
-    && export MAKEFLAGS="-j$(nproc)" \
+# protobuf-dev + zlib-dev provide headers needed for gRPC compilation.
+RUN apk add --no-cache protobuf-dev zlib-dev \
+    && export MAKEFLAGS="-j2" \
     && php -d memory_limit=-1 "$(which pecl)" install grpc-1.65.5 \
     && php -d memory_limit=-1 "$(which pecl)" install protobuf-4.29.1 \
     && rm -rf /tmp/pear /tmp/pear-* \
