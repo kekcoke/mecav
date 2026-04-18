@@ -4,18 +4,37 @@ services:
       - ./services/python/.env.local
     volumes:
       - ./services/python/app:/app/app
+      # Dev volume mount overlays the build-time compiled stubs, so the command
+      # below recompiles protos on each container start to pick up .proto changes.
       - ./services/python/proto:/app/proto
       - ./protobuf:/proto
+      # Anonymous volume prevents host __pycache__ from leaking into the container.
       - /app/__pycache__
     command: >
-      sh -c "python -m grpc_tools.protoc -I /proto --python_out=/app/proto --grpc_python_out=/app/proto /proto/multimodal.proto && sed -i 's/^import multimodal_pb2/from proto import multimodal_pb2/' /app/proto/multimodal_pb2_grpc.py && uvicorn app.rest_server:app --host 0.0.0.0 --port 8001 --reload"
+      sh -c "
+        python -m grpc_tools.protoc
+          -I /proto
+          --python_out=/app/proto
+          --grpc_python_out=/app/proto
+          /proto/multimodal.proto
+        && sed -i
+          's/^import multimodal_pb2/from proto import multimodal_pb2/'
+          /app/proto/multimodal_pb2_grpc.py
+        && touch /app/proto/__init__.py
+        && watchfiles 'python -m app.main' /app"
 
   laravel-api:
-    image: mecav-laravel-api:latest
+    # No `image:` override here — without this key the service inherits the
+    # `build:` directive from docker-compose.yml and builds locally.
+    # The previous `image: mecav-laravel-api:latest` caused Docker Compose to
+    # pull a stale pre-built image instead of using the local build.
     env_file:
       - ./services/laravel/.env.local
     volumes:
       - ./services/laravel:/var/www/html
+      # Prevent the host vendor/ directory from shadowing the image's
+      # composer-installed packages. Remove if you want IDE autocompletion
+      # from the host vendor/.
       - /var/www/html/vendor
 
   vite:
@@ -23,6 +42,12 @@ services:
     working_dir: /var/www/html
     volumes:
       - ./services/laravel:/var/www/html
+      # Named volume caches node_modules across restarts so npm install does
+      # not re-download the full dependency tree on every `docker compose up`.
+      - vite_node_modules:/var/www/html/node_modules
     ports:
       - "5173:5173"
     command: sh -c "npm install && npm run dev"
+
+volumes:
+  vite_node_modules:
