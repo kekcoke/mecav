@@ -119,7 +119,8 @@
                 headers: { 
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
-                }
+                },
+                credentials: 'same-origin'
             });
             if (!res.ok) return;
             const data = await res.json();
