@@ -10,18 +10,7 @@ services:
       - ./protobuf:/proto
       # Anonymous volume prevents host __pycache__ from leaking into the container.
       - /app/__pycache__
-    command: >
-      sh -c "
-        python -m grpc_tools.protoc
-          -I /proto
-          --python_out=/app/proto
-          --grpc_python_out=/app/proto
-          /proto/multimodal.proto
-        && sed -i
-          's/^import multimodal_pb2/from proto import multimodal_pb2/'
-          /app/proto/multimodal_pb2_grpc.py
-        && touch /app/proto/__init__.py
-        && watchfiles 'python -m app.main' /app"
+    command: ["sh", "-c", "python -m grpc_tools.protoc -I /proto --python_out=/app/proto --grpc_python_out=/app/proto /proto/multimodal.proto && sed -i 's/^import multimodal_pb2/from proto import multimodal_pb2/' /app/proto/multimodal_pb2_grpc.py && touch /app/proto/__init__.py && watchfiles 'python -m app.main' /app"]
 
   laravel-api:
     # No `image:` override here — without this key the service inherits the

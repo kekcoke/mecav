@@ -21,7 +21,7 @@ FROM php:8.3-fpm AS builder
 
 # All build-time deps: compiler toolchain + postgres + zlib dev headers
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        libpq-dev linux-headers-${KERNEL_VERSION} zlib1g-dev $PHPIZE_DEPS \
+        libpq-dev zlib1g-dev $PHPIZE_DEPS \
     && rm -rf /var/lib/apt/lists/*
 
 # Install gRPC and Protobuf via pecl *separately* so each failure surfaces.
@@ -94,7 +94,7 @@ RUN php artisan route:cache \
     && php artisan view:cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
-COPY services/laravel/nginx.conf /etc/nginx/http.d/default.conf
+COPY services/laravel/nginx.conf /etc/nginx/conf.d/default.conf
 COPY services/laravel/supervisord.conf /etc/supervisord.conf
 COPY services/laravel/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

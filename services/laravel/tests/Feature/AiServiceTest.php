@@ -21,7 +21,7 @@ class AiServiceTest extends TestCase
         // Reset config
         config(['grpc.python_service_host' => 'python-service:8001']);
         config(['grpc.service_token' => 'test-token']);
-        config(['grpc.timeout_ms' => 5000]);
+        config(['grpc.timeout_ms' => 8000]);
     }
 
     /** @test */
