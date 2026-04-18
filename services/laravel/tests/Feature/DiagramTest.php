@@ -22,13 +22,13 @@ class DiagramTest extends TestCase
     public function test_user_can_view_diagrams_index()
     {
         $response = $this->actingAs($this->user)->get('/diagrams');
-        $response.assertStatus(200);
+        $response->assertStatus(200);
     }
 
     public function test_user_can_view_create_diagram_page()
     {
         $response = $this->actingAs($this->user)->get('/diagrams/create');
-        $response.assertStatus(200);
+        $response->assertStatus(200);
     }
 
     public function test_unauthenticated_user_is_redirected()
@@ -41,7 +41,8 @@ class DiagramTest extends TestCase
     {
         $response = $this->actingAs($this->user, 'sanctum')->postJson('/api/diagrams', [
             'title' => 'Test Diagram',
-            'diagram_type' => 'flowchart'
+            'diagram_type' => 'flowchart',
+            'mermaid_code' => 'flowchart TD\n    Start --> End'
         ]);
 
         $response->assertStatus(201)

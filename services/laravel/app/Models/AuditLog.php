@@ -2,14 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Str;
 
 class AuditLog extends Model
 {
-    use HasUlids;
 
     public $timestamps = false;
 
@@ -25,6 +24,19 @@ class AuditLog extends Model
         'metadata'   => 'array',
         'created_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($log) {
+            if (empty($log->ulid)) {
+                $log->ulid = (string) Str::ulid();
+            }
+            if (empty($log->created_at)) {
+                $log->created_at = now();
+            }
+        });
+    }
 
     public function auditable(): MorphTo
     {

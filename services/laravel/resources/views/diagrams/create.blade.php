@@ -31,7 +31,7 @@
                     <option value="flowchart">Flowchart</option>
                     <option value="sequence">Sequence Diagram</option>
                     <option value="class">Class Diagram</option>
-                    <option value="er">ER Diagram</option>
+                    <option value="erd">ER Diagram</option>
                 </select>
             </div>
 
