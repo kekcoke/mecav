@@ -6,7 +6,9 @@ WORKDIR /app
 # Copy only manifests first for better layer caching
 COPY services/laravel/package.json services/laravel/package-lock.json* ./
 COPY services/laravel/vite.config.js ./
-# index.html is the Vite entry point — only copy if it exists at the Laravel root
+# index.html is Vite's entry module — required even in Laravel projects that use
+# a plain Vite config rather than laravel-vite-plugin.
+COPY services/laravel/index.html ./
 COPY services/laravel/resources ./resources
 COPY services/laravel/public ./public
 
